@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "EC2 Instance that serves a Discord Bot"
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to use
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+
+  AMIID:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: Latest Amazon Linux 2 AMI
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of SSH keypair
+    Default: discord-fleet
+
+  EC2TargetInstanceId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Target EC2 Server to be managed
+    Default: default
+
+  BotSecretKey:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Discord bot assigned secret key
+    Default: secret
+
+  SSHLocation:
+    Type: String
+    Description: IP to SSH to the EC2 instance
+    Default: 0.0.0.0/0
+    # MinLength: 9
+    # MaxLength: 18
+    # AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    # ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  BotPublicRepo:
+    Type: String
+    Description: Public repository to fetch source code on EC2 UserData Script
+    Default: git@github.com:cgustav/DiscordBot-EC2Controller.git
+
+Resources:
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-ec2
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-s3
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AttachVolume
+                  - ec2:DescribeInstanceStatus
+                  - ec2:DescribeInstances
+                  - ec2:RunInstances
+                  - ec2:RunScheduledInstances
+                  - ec2:StartInstances
+                  - ec2:StopInstances
+                Resource:
+                  - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${EC2TargetInstanceId}
+                  # - !Sub arn:aws:s3:::${S3BucketName}/7dserver.txt
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2InstanceRole
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref AWS::StackName
+      GroupDescription: Security group for public discord server
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIID
+      AvailabilityZone: !Sub ${AWS::Region}a
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      KeyName: !Ref KeyPair
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      Tags:
+        - Key: AccessControl
+          Value: Discord
+        - Key: Name
+          Value: DiscordBotServer
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          # Packages
+          yum update -y;
+          curl -sL https://rpm.nodesource.com/setup_16.x | sudo bash -;
+          yum install -y nodejs git
+          mkdir /opt/bots; 
+
+          # cfn-init
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region};
+
+          # Fetching App Source 
+          cd /opt/bots;
+          git clone ${BotPublicRepo} djs-ec2manager;
+          cd djs-ec2manager;
+          npm install --production;
+
+          # Setting Environment Setup
+          cat > .env << EOF
+          MODE=PROD
+          BOT_TOKEN_SECRET=${BotSecretKey}
+          EOF;
+
+          # Cron Setup
+          echo "@reboot cd /opt/bots/djs-ec2manager && npm run start" | crontab -;
+
+          # Reboot
+          reboot;
