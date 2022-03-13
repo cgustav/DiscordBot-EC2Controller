@@ -131,7 +131,7 @@ Resources:
           mkdir /home/ec2-user/bots; 
 
           # cfn-init
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region};
+          # /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region};
 
           # Fetching App Source 
           cd /home/ec2-user/bots;
