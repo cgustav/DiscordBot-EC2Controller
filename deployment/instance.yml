@@ -127,7 +127,7 @@ Resources:
           # Packages
           yum update -y;
           curl -sL https://rpm.nodesource.com/setup_16.x | sudo bash -;
-          yum install -y nodejs git
+          yum install -y nodejs git;
           mkdir /home/ec2-user/bots; 
 
           # cfn-init
