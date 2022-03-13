@@ -139,19 +139,18 @@ Resources:
           cd djs-ec2manager;
           npm install --production;
 
+          # PM2 Setup
+          npm install pm2 -g;
+          pm2 start /home/ec2-user/bots/djs-ec2manager/index.js;
+          sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ec2-user --hp /home/ec2-user;
+          pm2 save;
+
           # Setting Environment Setup
           cat > .env <<EOF
           MODE=PROD
           BOT_SECRET_TOKEN=${BotSecretKey}
           EOF
           ;
-
-          # Cron Setup
-          npm install pm2 -g;
-          pm2 start /home/ec2-user/bots/djs-ec2manager/index.js;
-          sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ec2-user --hp /home/ec2-user;
-          pm2 save
-          # echo "@reboot /home/ec2-user/bots/djs-ec2manager/startbot.sh" | crontab -;
 
           # Reboot
           reboot;
