@@ -3,8 +3,10 @@ Description: "EC2 Instance that serves a Discord Bot"
 
 Parameters:
   VpcId:
-    Type: AWS::EC2::VPC::Id
+    # Type: AWS::EC2::VPC::Id
+    Type: AWS::SSM::Parameter::Value<String>
     Description: VPC to use
+    Default: account-vpc-id
 
   InstanceType:
     Description: EC2 instance type
@@ -19,17 +21,17 @@ Parameters:
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of SSH keypair
-    Default: discord-fleet
+    Default: discord-bot
 
   EC2TargetInstanceId:
     Type: AWS::SSM::Parameter::Value<String>
-    Description: Target EC2 Server to be managed
-    Default: default
+    Description: Target EC2 Instance to be managed by discord bot
+    Default: djsbot-controle-instanceid
 
   BotSecretKey:
     Type: AWS::SSM::Parameter::Value<String>
-    Description: Discord bot assigned secret key
-    Default: secret
+    Description: Discord bot's assigned secret token
+    Default: djsbot-secret
 
   SSHLocation:
     Type: String
