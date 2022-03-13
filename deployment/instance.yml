@@ -45,7 +45,7 @@ Parameters:
   BotPublicRepo:
     Type: String
     Description: Public repository to fetch source code on EC2 UserData Script
-    Default: git@github.com:cgustav/DiscordBot-EC2Controller.git
+    Default: https://github.com/cgustav/DiscordBot-EC2Controller.git
 
 Resources:
   EC2InstanceRole:
@@ -128,25 +128,30 @@ Resources:
           yum update -y;
           curl -sL https://rpm.nodesource.com/setup_16.x | sudo bash -;
           yum install -y nodejs git
-          mkdir /opt/bots; 
+          mkdir /home/ec2-user/bots; 
 
           # cfn-init
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region};
 
           # Fetching App Source 
-          cd /opt/bots;
+          cd /home/ec2-user/bots;
           git clone ${BotPublicRepo} djs-ec2manager;
           cd djs-ec2manager;
           npm install --production;
 
           # Setting Environment Setup
-          cat > .env << EOF
+          cat > .env <<EOF
           MODE=PROD
-          BOT_TOKEN_SECRET=${BotSecretKey}
-          EOF;
+          BOT_SECRET_TOKEN=${BotSecretKey}
+          EOF
+          ;
 
           # Cron Setup
-          echo "@reboot cd /opt/bots/djs-ec2manager && npm run start" | crontab -;
+          npm install pm2 -g;
+          pm2 start /home/ec2-user/bots/djs-ec2manager/index.js;
+          sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ec2-user --hp /home/ec2-user;
+          pm2 save
+          # echo "@reboot /home/ec2-user/bots/djs-ec2manager/startbot.sh" | crontab -;
 
           # Reboot
           reboot;

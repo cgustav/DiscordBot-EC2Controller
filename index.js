@@ -1,4 +1,7 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({
+  path: path.join(__dirname, ".env"),
+});
 const AWSManager = require("./src/aws-manager");
 const { Client, Intents, MessageEmbed } = require("discord.js");
 
